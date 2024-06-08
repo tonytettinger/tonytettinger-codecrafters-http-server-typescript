@@ -1,6 +1,7 @@
 import * as net from "net"
 
 const server = net.createServer((socket) => {
+  socket.write("HTTP/1.1 200 OK\r\n\r\n")
   socket.end()
 })
 
@@ -14,5 +15,5 @@ OK
 `
 // Uncomment this to pass the first stage
 server.listen(4221, "localhost", () => {
-  return response
+  console.log("Server is running on port 4221")
 })
