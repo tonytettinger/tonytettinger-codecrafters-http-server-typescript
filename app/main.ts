@@ -1,9 +1,23 @@
 import * as net from "net"
 
 const responseTypes = {
-  200: "HTTP/1.1 200 OK\r\n\r\n",
-  400: "HTTP/1.1 404 Not Found\r\n\r\n",
+  200: "HTTP/1.1 200 OK\r\n",
+  404: "HTTP/1.1 404 Not Found\r\n\r\n",
 }
+
+const contentTypes = {
+  text: "Content-Type: text/plain\r\n",
+}
+
+const contentLength = (number: number) => `Content-Length: ${number}\r\n\r\n`
+
+const echoTextMatch = (text: string) => {
+  const match = text.match(/\/echo\/(\w+)/)
+  const result = match?.length ? match[1] : false
+  return result
+}
+
+const endRequestLine = "\r\n"
 
 const parseResponse = (resp: Buffer) => {
   const [request] = resp.toString().split("\r\n")
@@ -11,14 +25,21 @@ const parseResponse = (resp: Buffer) => {
   return { path }
 }
 const server = net.createServer((socket) => {
-  console.log("test")
   socket.on("data", (data) => {
     const parsedReq = parseResponse(data)
-    let response = responseTypes[400]
+    let response = responseTypes[404]
     if (parsedReq.path == "/") {
       response = responseTypes[200]
+    } else if (echoTextMatch(parsedReq.path)) {
+      const matchedText = echoTextMatch(parsedReq.path)
+      const matchedTextLength = matchedText ? matchedText.length : 0
+      response =
+        responseTypes[200] +
+        contentTypes.text +
+        contentLength(matchedTextLength) +
+        matchedText
     }
-    socket.write(response)
+    socket.write(response + endRequestLine)
     socket.end()
   })
 })
