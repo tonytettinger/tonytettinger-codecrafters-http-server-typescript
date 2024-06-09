@@ -6,9 +6,9 @@ const responseTypes = {
 }
 
 const parseResponse = (resp: Buffer) => {
-  const responseString = resp.toString().split(" ")
-  const [requestType, path] = responseString
-  return { requestType, path }
+  const [request] = resp.toString().split("\r\n")
+  const [, path] = request.split(" ")
+  return { path }
 }
 const server = net.createServer((socket) => {
   console.log("test")
