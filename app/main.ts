@@ -1,4 +1,6 @@
 import * as net from "net"
+import fs from "fs"
+import * as process from "process"
 
 const responseTypes = {
   200: "HTTP/1.1 200 OK\r\n",
@@ -7,6 +9,7 @@ const responseTypes = {
 
 const contentTypes = {
   text: "Content-Type: text/plain\r\n",
+  file: "Content-Type: application/octet-stream\r\n",
 }
 
 const contentLength = (number: number) => `Content-Length: ${number}\r\n\r\n`
@@ -33,10 +36,33 @@ const userAgentMatch = (path: string, agent: string) => {
   return response
 }
 
+const fileMatch = (path: string) => {
+  const regex = /\/files\/(\w+)/
+  const match = path.match(regex)
+  const fileName = match !== null ? match[1] : ""
+  let directory: string = process.argv[3]
+
+  const pathToFile = `${directory}/${fileName}`
+  let responseContent = null
+  try {
+    responseContent = fs.readFileSync(pathToFile)
+  } catch {
+    return false
+  }
+
+  if (match == null || responseContent == null) return false
+  return (
+    responseTypes[200] +
+    contentTypes.file +
+    contentLength(responseContent.length) +
+    responseContent
+  )
+}
+
 const basePathMatch = (path: string) =>
   path === "/" ? responseTypes[200] : false
 
-const matchers = [echoTextPathMatch, userAgentMatch, basePathMatch]
+const matchers = [echoTextPathMatch, userAgentMatch, basePathMatch, fileMatch]
 
 const matchPaths = (path: string, userAgent = "") => {
   let res = responseTypes[404]
