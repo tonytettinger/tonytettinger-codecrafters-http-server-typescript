@@ -11,34 +11,61 @@ const contentTypes = {
 
 const contentLength = (number: number) => `Content-Length: ${number}\r\n\r\n`
 
-const echoTextMatch = (text: string) => {
-  const match = text.match(/\/echo\/(\w+)/)
-  const result = match?.length ? match[1] : false
-  return result
+const echoTextPathMatch = (path: string) => {
+  const regex = /\/echo\/(\w+)/
+  const match = path.match(regex)
+  const text = match !== null ? match[1] : ""
+  const textLength = text?.length
+  if (match == null || text == "" || textLength == 0) return false
+  const response =
+    responseTypes[200] + contentTypes.text + contentLength(textLength) + text
+  return response
+}
+
+const userAgentMatch = (path: string, agent: string) => {
+  const regex = /\/user-agent/
+  const match = path.match(regex)
+  const text = agent
+  const textLength = text?.length
+  if (match == null || text == "" || textLength == 0) return false
+  let response =
+    responseTypes[200] + contentTypes.text + contentLength(textLength) + text
+  return response
+}
+
+const basePathMatch = (path: string) =>
+  path === "/" ? responseTypes[200] : false
+
+const matchers = [echoTextPathMatch, userAgentMatch, basePathMatch]
+
+const matchPaths = (path: string, userAgent = "") => {
+  let res = responseTypes[404]
+  let currentCheck
+  for (const matchFunc of matchers) {
+    currentCheck = matchFunc(path, userAgent)
+    if (typeof currentCheck == "string") {
+      res = currentCheck
+      break
+    }
+  }
+  return res
 }
 
 const endRequestLine = "\r\n"
 
 const parseResponse = (resp: Buffer) => {
-  const [request] = resp.toString().split("\r\n")
+  const [request, , userAgent] = resp.toString().split("\r\n")
   const [, path] = request.split(" ")
-  return { path }
+  const [, agent] = userAgent.split(" ")
+  return { path, agent }
 }
+
 const server = net.createServer((socket) => {
   socket.on("data", (data) => {
     const parsedReq = parseResponse(data)
-    let response = responseTypes[404]
-    if (parsedReq.path == "/") {
-      response = responseTypes[200]
-    } else if (echoTextMatch(parsedReq.path)) {
-      const matchedText = echoTextMatch(parsedReq.path)
-      const matchedTextLength = matchedText ? matchedText.length : 0
-      response =
-        responseTypes[200] +
-        contentTypes.text +
-        contentLength(matchedTextLength) +
-        matchedText
-    }
+    let response = matchPaths(parsedReq.path, parsedReq.agent)
+      ? matchPaths(parsedReq.path, parsedReq.agent)
+      : responseTypes[404]
     socket.write(response + endRequestLine)
     socket.end()
   })
