@@ -4,6 +4,7 @@ import * as process from "process"
 
 const responseTypes = {
   200: "HTTP/1.1 200 OK\r\n",
+  201: "HTTP/1.1 201 Created\r\n",
   404: "HTTP/1.1 404 Not Found\r\n\r\n",
 }
 
@@ -12,11 +13,20 @@ const contentTypes = {
   file: "Content-Type: application/octet-stream\r\n",
 }
 
+type MatchingFunctionArgs = {
+  path?: string
+  userAgent?: string
+  type?: string
+  length?: string
+  body?: string
+}
+
 const contentLength = (number: number) => `Content-Length: ${number}\r\n\r\n`
 
-const echoTextPathMatch = (path: string) => {
+const echoTextPathMatch = (args: MatchingFunctionArgs) => {
+  if (args.path === undefined) return false
   const regex = /\/echo\/(\w+)/
-  const match = path.match(regex)
+  const match = args.path.match(regex)
   const text = match !== null ? match[1] : ""
   const textLength = text?.length
   if (match == null || text == "" || textLength == 0) return false
@@ -25,20 +35,22 @@ const echoTextPathMatch = (path: string) => {
   return response
 }
 
-const userAgentMatch = (path: string, agent: string) => {
+const userAgentMatch = (args: MatchingFunctionArgs) => {
+  if (args.path === undefined) return false
   const regex = /\/user-agent/
-  const match = path.match(regex)
-  const text = agent
-  const textLength = text?.length
+  const match = args.path.match(regex)
+  const text = args.userAgent
+  const textLength = text?.length ?? 0
   if (match == null || text == "" || textLength == 0) return false
   let response =
     responseTypes[200] + contentTypes.text + contentLength(textLength) + text
   return response
 }
 
-const fileMatch = (path: string) => {
+const fileMatch = (args: MatchingFunctionArgs) => {
   const regex = /\/files\/(\w+)/
-  const match = path.match(regex)
+  if (args.path === undefined) return false
+  const match = args.path.match(regex)
   const fileName = match !== null ? match[1] : ""
   let directory: string = process.argv[3]
 
@@ -59,16 +71,38 @@ const fileMatch = (path: string) => {
   )
 }
 
-const basePathMatch = (path: string) =>
-  path === "/" ? responseTypes[200] : false
+const basePathMatch = (args: MatchingFunctionArgs) =>
+  args.path === "/" ? responseTypes[200] : false
 
-const matchers = [echoTextPathMatch, userAgentMatch, basePathMatch, fileMatch]
+const postFileMatch = (args: MatchingFunctionArgs) => {
+  if (args.type === "POST" && args.length && args.body && args.path) {
+    const regex = /\/files\/(\w+)/
+    const match = args.path.match(regex)
+    const fileName = match !== null ? match[1] : ""
+    const directory = process.argv[3]
+    const writePath = `${directory}/${fileName}`
+    try {
+      fs.writeFileSync(writePath, args.body, "utf-8")
+    } catch {
+      return false
+    }
+    return responseTypes[201]
+  }
+}
 
-const matchPaths = (path: string, userAgent = "") => {
+const matchers = [
+  echoTextPathMatch,
+  userAgentMatch,
+  basePathMatch,
+  fileMatch,
+  postFileMatch,
+]
+
+const matchPaths = (args: MatchingFunctionArgs) => {
   let res = responseTypes[404]
   let currentCheck
   for (const matchFunc of matchers) {
-    currentCheck = matchFunc(path, userAgent)
+    currentCheck = matchFunc(args)
     if (typeof currentCheck == "string") {
       res = currentCheck
       break
@@ -79,19 +113,60 @@ const matchPaths = (path: string, userAgent = "") => {
 
 const endRequestLine = "\r\n"
 
+const responeLines = {
+  agent: ["User-Agent:"],
+  path: ["POST", "GET"],
+  length: ["Content-Length:"],
+} as const
+
+type ParsedResponses = {
+  agent?: string
+  path?: string
+  length?: string
+  body?: string
+  type?: string
+}
+
 const parseResponse = (resp: Buffer) => {
-  const [request, , userAgent] = resp.toString().split("\r\n")
-  const [, path] = request.split(" ")
-  const [, agent] = userAgent.split(" ")
-  return { path, agent }
+  let responseData: ParsedResponses = {}
+  const responseArray = resp.toString().split("\r\n")
+  for (const responseLine of responseArray) {
+    const [responseKey, responseValue] = responseLine.split(" ")
+    for (const [key, value] of Object.entries(responeLines)) {
+      value.forEach((val) => {
+        if (responeLines.path.includes(responseKey as "POST" | "GET")) {
+          console.log("In path", responseKey)
+          responseData["type"] = responseKey
+        }
+        if (val === responseKey)
+          responseData[key as keyof ParsedResponses] = responseValue
+        else if (responseLine[0] !== "") {
+          responseData.body = responseLine
+        }
+      })
+    }
+  }
+
+  return responseData
 }
 
 const server = net.createServer((socket) => {
   socket.on("data", (data) => {
+    let response
     const parsedReq = parseResponse(data)
-    let response = matchPaths(parsedReq.path, parsedReq.agent)
-      ? matchPaths(parsedReq.path, parsedReq.agent)
-      : responseTypes[404]
+    const argumentsForMatcher = {
+      path: parsedReq.path,
+      userAgent: parsedReq.agent,
+      type: parsedReq.type,
+      length: parsedReq.length,
+      body: parsedReq.body,
+    }
+    try {
+      response = matchPaths(argumentsForMatcher)
+    } catch {
+      console.log("Error in request")
+      response = responseTypes[404]
+    }
     socket.write(response + endRequestLine)
     socket.end()
   })
