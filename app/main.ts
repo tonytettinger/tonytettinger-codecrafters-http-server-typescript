@@ -102,15 +102,18 @@ const matchers = [
 ]
 
 const validEncodings = ["gzip"]
-const checkValidEncoding = (encoding: string) =>
-  validEncodings.includes(encoding)
+const checkValidEncoding = (encodings: string[]) => {
+  return encodings.map((el) => validEncodings.includes(el)).join("")
+}
 
 const checkEncoding = (encoding: string, res: string) => {
-  if (encoding && checkValidEncoding(encoding)) {
+  const encodings = encoding.split(", ")
+  const usedEncoding = checkValidEncoding(encodings)
+  if (encoding && usedEncoding) {
     const currentRes = res.split("\r\n")
     const withEncoding = [
       ...currentRes.slice(0, 1),
-      encodingType(encoding),
+      usedEncoding,
       ...currentRes.slice(1),
     ]
     return withEncoding.join("\r\n")
