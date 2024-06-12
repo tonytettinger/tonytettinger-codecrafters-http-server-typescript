@@ -162,16 +162,22 @@ const parseResponse = (resp: Buffer) => {
   let responseData: ParsedResponses = {}
   const responseArray = resp.toString().split("\r\n")
   for (const responseLine of responseArray) {
-    const [responseKey, responseValue] = responseLine.split(": ")
+    const [responseKey, responseValue, ...restOfResponseVals] =
+      responseLine.split(" ")
     for (const [key, value] of Object.entries(responeLines)) {
       value.forEach((val) => {
-        if (responeLines.path.includes(responseKey as "POST" | "GET")) {
+        if (
+          responeLines.path.includes("POST") ||
+          responeLines.path.includes("GET")
+        ) {
           console.log("In path", responseKey)
           responseData["type"] = responseKey
         }
-        if (val === responseKey)
+        if (responeLines.encoding[0] === responseKey) {
+          responseData.encoding = [...restOfResponseVals].join()
+        } else if (val === responseKey) {
           responseData[key as keyof ParsedResponses] = responseValue
-        else if (responseLine[0] !== "") {
+        } else if (responseLine[0] !== "") {
           responseData.body = responseLine
         }
       })
