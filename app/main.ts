@@ -109,6 +109,7 @@ const checkValidEncoding = (encodings: string[]) => {
 const checkEncoding = (encoding: string, res: string) => {
   const encodings = encoding.split(", ")
   const usedEncoding = checkValidEncoding(encodings)
+  return usedEncoding
   if (encoding && usedEncoding) {
     const currentRes = res.split("\r\n")
     const withEncoding = [
