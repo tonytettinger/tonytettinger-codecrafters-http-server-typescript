@@ -19,9 +19,12 @@ type MatchingFunctionArgs = {
   type?: string
   length?: string
   body?: string
+  encoding?: string
 }
 
 const contentLength = (number: number) => `Content-Length: ${number}\r\n\r\n`
+const encodingType = (encoding: string) =>
+  `Content-Encoding: ${encoding}\r\n\r\n`
 
 const echoTextPathMatch = (args: MatchingFunctionArgs) => {
   if (args.path === undefined) return false
@@ -98,6 +101,24 @@ const matchers = [
   postFileMatch,
 ]
 
+const validEncodings = ["gzip"]
+const checkValidEncoding = (encoding: string) =>
+  validEncodings.includes(encoding)
+
+const checkEncoding = (encoding: string, res: string) => {
+  if (encoding && checkValidEncoding(encoding)) {
+    const currentRes = res.split("\r\n")
+    const withEncoding = [
+      ...currentRes.slice(0, 1),
+      encodingType(encoding),
+      ...currentRes.slice(1),
+    ]
+    return withEncoding.join("\r\n")
+  } else {
+    return res
+  }
+}
+
 const matchPaths = (args: MatchingFunctionArgs) => {
   let res = responseTypes[404]
   let currentCheck
@@ -108,6 +129,9 @@ const matchPaths = (args: MatchingFunctionArgs) => {
       break
     }
   }
+  if (args.encoding) {
+    res = checkEncoding(args.encoding, res)
+  }
   return res
 }
 
@@ -117,6 +141,7 @@ const responeLines = {
   agent: ["User-Agent:"],
   path: ["POST", "GET"],
   length: ["Content-Length:"],
+  encoding: ["Accept-Encoding:"],
 } as const
 
 type ParsedResponses = {
@@ -125,6 +150,7 @@ type ParsedResponses = {
   length?: string
   body?: string
   type?: string
+  encoding?: string
 }
 
 const parseResponse = (resp: Buffer) => {
@@ -160,6 +186,7 @@ const server = net.createServer((socket) => {
       type: parsedReq.type,
       length: parsedReq.length,
       body: parsedReq.body,
+      encoding: parsedReq.encoding,
     }
     try {
       response = matchPaths(argumentsForMatcher)
