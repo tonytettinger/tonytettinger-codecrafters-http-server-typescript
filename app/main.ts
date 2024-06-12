@@ -102,20 +102,17 @@ const matchers = [
 ]
 
 const validEncodings = ["gzip"]
-const checkValidEncoding = (encodings: string[]) => {
-  return encodings.map((el) => validEncodings.includes(el)).join("")
+const checkValidEncoding = (encoding: string) => {
+  return validEncodings.find((el) => encoding.includes(el)) || false
 }
 
 const checkEncoding = (encoding: string, res: string) => {
-  //const encodings = encoding.split(", ")
-  return encoding
-  const usedEncoding = checkValidEncoding(encodings)
-  return usedEncoding
+  const usedEncoding = checkValidEncoding(encoding)
   if (encoding && usedEncoding) {
     const currentRes = res.split("\r\n")
     const withEncoding = [
       ...currentRes.slice(0, 1),
-      usedEncoding,
+      encodingType(usedEncoding),
       ...currentRes.slice(1),
     ]
     return withEncoding.join("\r\n")
@@ -166,15 +163,11 @@ const parseResponse = (resp: Buffer) => {
       responseLine.split(" ")
     for (const [key, value] of Object.entries(responeLines)) {
       value.forEach((val) => {
-        if (
-          responeLines.path.includes("POST") ||
-          responeLines.path.includes("GET")
-        ) {
-          console.log("In path", responseKey)
+        if (responseKey.includes("GET") || responseKey.includes("POST")) {
           responseData["type"] = responseKey
         }
-        if (responeLines.encoding[0] === responseKey) {
-          responseData.encoding = [...restOfResponseVals].join()
+        if (responseKey === responeLines.encoding[0]) {
+          responseData.encoding = [responseValue, ...restOfResponseVals].join()
         } else if (val === responseKey) {
           responseData[key as keyof ParsedResponses] = responseValue
         } else if (responseLine[0] !== "") {
