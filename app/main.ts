@@ -108,7 +108,7 @@ const checkValidEncoding = (encodings: string[]) => {
 
 const checkEncoding = (encoding: string, res: string) => {
   const encodings = encoding.split(", ")
-  return encodings[1]
+  return encoding
   const usedEncoding = checkValidEncoding(encodings)
   return usedEncoding
   if (encoding && usedEncoding) {
