@@ -107,7 +107,7 @@ const checkValidEncoding = (encodings: string[]) => {
 }
 
 const checkEncoding = (encoding: string, res: string) => {
-  const encodings = encoding.split(", ")
+  //const encodings = encoding.split(", ")
   return encoding
   const usedEncoding = checkValidEncoding(encodings)
   return usedEncoding
@@ -162,7 +162,7 @@ const parseResponse = (resp: Buffer) => {
   let responseData: ParsedResponses = {}
   const responseArray = resp.toString().split("\r\n")
   for (const responseLine of responseArray) {
-    const [responseKey, responseValue] = responseLine.split(" ")
+    const [responseKey, responseValue] = responseLine.split(": ")
     for (const [key, value] of Object.entries(responeLines)) {
       value.forEach((val) => {
         if (responeLines.path.includes(responseKey as "POST" | "GET")) {
